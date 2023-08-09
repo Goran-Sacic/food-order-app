@@ -1,10 +1,16 @@
 import Modal from "../UI/Modal";
 import styles from "./Cart.module.css";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import CartContext from "../../store/cart-context";
 import CartItem from "./CartItem";
+import Checkout from "./Checkout";
+import React from "react";
 
 export default function Cart(props) {
+  const [isCheckout, setIsCheckout] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [didSubmit, setDidSubmit] = useState(false);
+
   const cartCtx = useContext(CartContext);
   const totalAmount = `€${cartCtx.totalAmount.toFixed(2)}`;
   const hasItems = cartCtx.items.length > 0;
@@ -33,20 +39,70 @@ export default function Cart(props) {
     </ul>
   );
 
-  return (
-    <Modal onClose={props.onClose}>
-      {cartItems}
+  const handleOrder = () => {
+    setIsCheckout(true);
+  };
 
+  const submitOrderHandler = async (userData) => {
+    setIsSubmitting(true);
+    await fetch(
+      "https://react-http-92239-default-rtdb.europe-west1.firebasedatabase.app/orders.json",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          user: userData,
+          orderedItems: cartCtx.items,
+        }),
+      }
+    );
+    setIsSubmitting(false);
+    setDidSubmit(true);
+    cartCtx.clearCart();
+  };
+
+  const modalActions = (
+    <div className={styles.actions}>
+      <button className={styles["button--alt"]} onClick={props.onClose}>
+        Zatvori
+      </button>
+      {hasItems && (
+        <button className={styles.button} onClick={handleOrder}>
+          Naruči
+        </button>
+      )}
+    </div>
+  );
+
+  const cartModalContent = (
+    <React.Fragment>
+      {cartItems}
       <div className={styles.total}>
-        <span>Ukupni iznos:</span>
+        <span>Ukupan iznos:</span>
         <span>{totalAmount}</span>
       </div>
+      {isCheckout && (
+        <Checkout onConfirm={submitOrderHandler} onCancel={props.onClose} />
+      )}
+      {!isCheckout && modalActions}
+    </React.Fragment>
+  );
+
+  const isSubmittingModalContent = <p>Šaljem narudžbu...</p>;
+  const didSubmitModalContent = (
+    <React.Fragment>
+      <p>Narudžba poslana!</p>
       <div className={styles.actions}>
-        <button className={styles["button--alt"]} onClick={props.onClose}>
+        <button className={styles.button} onClick={props.onClose}>
           Zatvori
         </button>
-        {hasItems && <button className={styles.button}>Naruči</button>}
       </div>
+    </React.Fragment>
+  );
+  return (
+    <Modal onClose={props.onClose}>
+      {!isSubmitting && !didSubmit && cartModalContent}
+      {isSubmitting && isSubmittingModalContent}
+      {didSubmit && didSubmitModalContent}
     </Modal>
   );
 }
